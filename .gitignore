@@ -1,6 +1,6 @@
 # folders to igonre
 
-raw_data
+# raw_data
 
 # file formats to ignore
 *nc

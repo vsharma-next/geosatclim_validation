@@ -52,7 +52,7 @@ def read_metadata(metadata_path):
 def process_monthly_data(data_path, metadata, output_path):
     """Process monthly data and create NetCDF files."""
     # Read monthly data
-    df = pd.read_csv(data_path)
+    df = pd.read_csv(data_path, compression="zip")
 
     # Convert year/month to unix timestamp (seconds since epoch)
     df["timestamp"] = (
@@ -141,7 +141,7 @@ def process_monthly_data(data_path, metadata, output_path):
 
 def main():
     metadata_path = "./library/geba_metadata.csv"
-    monthly_data_path = "./raw_data/geba_monthlydata.csv"
+    monthly_data_path = "./raw_data/geba_monthlydata.zip"
 
     output_path = "./02_analysis_ready/geba"
     os.makedirs(output_path, exist_ok=True)
