@@ -32,11 +32,15 @@ These come in multiple forms:
 wget -O bsrn_stations.tab https://dataportals.pangaea.de/bsrn/stations?format=textfile
 ```
 
+lftp -e "set ssl:verify-certificate no; mirror --parallel=8 / .; quit" -u username,password ftp://ftp.bsrn.awi.de
+
 ### GEBA
 
 - Metadata = GEBA_2024-12-03_13-53-10_metadata.csv
 
 ### SwissMetNet
+
+/TODO
 
 ## Satellite Processing
 
