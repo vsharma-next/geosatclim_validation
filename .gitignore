@@ -1,13 +1,13 @@
 # folders to igonre
 
 # Ignore everything in raw_data
-raw_data/*
+01_raw_data/*
 
 # Allow all files in raw_data except CSV and TXT
-!raw_data/
-!raw_data/**/*.*
-raw_data/*.csv
-raw_data/*.txt
+!01_raw_data/
+!01_raw_data/**/*.*
+01_raw_data/*.csv
+01_raw_data/*.txt
 
 
 # file formats to ignore
