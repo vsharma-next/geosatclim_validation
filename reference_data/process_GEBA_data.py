@@ -14,7 +14,6 @@ def clean_station_name(name):
         .replace("(", "")
         .replace(")", "")
     )
-    # return cleaned.lower()
     return cleaned
 
 
@@ -24,11 +23,16 @@ def get_variable_name(ebcode):
     return var_mapping.get(ebcode, None)
 
 
-def read_metadata(metadata_path):
-    """Read and process GEBA metadata."""
+def process_geba_data(metadata_path, data_path, output_path):
+    """Single-pass processing of GEBA data with station analysis"""
     metadata = pd.read_csv(metadata_path)
+    data = pd.read_csv(data_path)
 
+    # Initialize storage
     station_info = {}
+    station_coverage = {}
+
+    # Process metadata and data together
     for _, row in metadata.iterrows():
         station_name = clean_station_name(row["sgname"])
         var_name = get_variable_name(row["ebcode"])
@@ -36,6 +40,7 @@ def read_metadata(metadata_path):
         if var_name is None:
             continue
 
+        # Store station metadata
         if station_name not in station_info:
             station_info[station_name] = {
                 "lon": row["sgxlon"],
@@ -44,27 +49,36 @@ def read_metadata(metadata_path):
                 "variables": {},
             }
 
+            # Get temporal coverage for this station
+            station_data = data[
+                data["tskey"].isin(
+                    metadata[metadata["sgname"] == row["sgname"]]["tskey"]
+                )
+            ]
+            if not station_data.empty:
+                station_coverage[station_name] = {
+                    "lon": row["sgxlon"],
+                    "lat": row["sgylat"],
+                    "elevation": row["sgelevation"],
+                    "start_year": station_data["year"].min(),
+                    "end_year": station_data["year"].max(),
+                }
+
         station_info[station_name]["variables"][var_name] = row["tskey"]
 
-    return station_info
+    # Save station coverage
+    coverage_df = pd.DataFrame.from_dict(station_coverage, orient="index")
+    coverage_df.index.name = "station"
+    coverage_df.to_csv(f"{output_path}/geba_station_coverage.csv")
 
-
-def process_monthly_data(data_path, metadata, output_path):
-    """Process monthly data and create NetCDF files."""
-    # Read monthly data
-    df = pd.read_csv(data_path, compression="zip")
-
-    # Convert year/month to unix timestamp (seconds since epoch)
-    df["timestamp"] = (
-        pd.to_datetime(df[["year", "month"]].assign(day=1)).astype("int64") // 1e9
+    # Create netCDF files
+    data["timestamp"] = (
+        pd.to_datetime(data[["year", "month"]].assign(day=1)).astype("int64") // 1e9
     )
-
-    # Group data by tskey for easier access
-    data_by_tskey = {tskey: group for tskey, group in df.groupby("tskey")}
+    data_by_tskey = {tskey: group for tskey, group in data.groupby("tskey")}
 
     # Process each station
-    for station_name, station_meta in metadata.items():
-        # Get data for all variables of this station
+    for station_name, station_meta in station_info.items():
         station_data = {}
         time_points = set()
 
@@ -121,7 +135,7 @@ def process_monthly_data(data_path, metadata, output_path):
 
         # Global attributes
         ds.attrs["Title"] = "GEBA Station Data"
-        ds.attrs["Institution"] = "GEBA - ETH Zurich"
+        ds.attrs["Institution"] = "GEBA ETH Zurich"
         ds.attrs["Conventions"] = "CF-1.4"
         ds.attrs["Timesteps"] = "Start of compositing period"
         ds.attrs["Coordinates"] = "Pixel center location"
@@ -135,18 +149,24 @@ def process_monthly_data(data_path, metadata, output_path):
         ).isoformat()
 
         # Save the file
-        filename = f"{output_path}/{station_name}.M.nc"
+        filename = f"{output_path}/geba/{station_name}.M.nc"
         ds.to_netcdf(filename)
+
+    return station_info, coverage_df
 
 
 def main():
     metadata_path = "./library/geba_metadata.csv"
     monthly_data_path = "./01_raw_data/geba_monthlydata.zip"
+    output_path = "./02_analysis_ready/"
 
-    output_path = "./02_analysis_ready/geba"
-    os.makedirs(output_path, exist_ok=True)
-    station_metadata = read_metadata(metadata_path)
-    process_monthly_data(monthly_data_path, station_metadata, output_path)
+    os.makedirs(f"{output_path}/geba", exist_ok=True)
+
+    station_info, coverage = process_geba_data(
+        metadata_path, monthly_data_path, output_path
+    )
+    print(f"Processed {len(station_info)} stations")
+    print("Station coverage summary saved to geba_station_coverage.csv")
 
 
 if __name__ == "__main__":
